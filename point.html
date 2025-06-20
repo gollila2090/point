@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>긍정 행동 스티커/포인트 앱</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            width: 420px; /* 크롬 확장 앱 팝업 너비 약간 증가 */
+            min-height: 480px; /* 최소 높이 증가 */
+            background-color: #f7fafc;
+            font-size: 16px; /* 기본 글꼴 크기 증가 */
+        }
+        .container {
+            padding: 1.25rem; /* 패딩 증가 */
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .sticker-emoji {
+            font-size: 3rem; /* 스티커 이모지 크기 더 크게 */
+            transition: transform 0.1s ease-in-out;
+        }
+        .sticker-emoji:hover {
+            transform: scale(1.1);
+        }
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1000; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 30px; /* 패딩 증가 */
+            border-radius: 12px;
+            width: 90%; /* 모달 너비 증가 */
+            max-width: 450px; /* 최대 너비 증가 */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 32px; /* 닫기 버튼 크기 증가 */
+            font-weight: bold;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        /* Chart.js responsive sizing */
+        canvas {
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* 추가된 스타일 */
+        h1 {
+            font-size: 2.5rem; /* h1 크기 더 크게 */
+            margin-bottom: 1rem;
+        }
+        h2 {
+            font-size: 1.75rem; /* h2 크기 더 크게 */
+            margin-bottom: 0.75rem;
+        }
+        .text-sm {
+            font-size: 1rem; /* 작은 텍스트도 기본 크기로 */
+        }
+        .text-lg {
+            font-size: 1.25rem; /* 큰 텍스트 크기 증가 */
+        }
+        input[type="text"], input[type="number"], select {
+            padding: 0.75rem; /* 입력 필드 패딩 증가 */
+            font-size: 1rem; /* 입력 필드 글꼴 크기 */
+        }
+        button {
+            padding: 0.75rem 1.25rem; /* 버튼 패딩 증가 */
+            font-size: 1rem; /* 버튼 글꼴 크기 */
+        }
+        .student-list > div, .reward-list > div {
+            padding: 0.75rem 1rem; /* 목록 항목 패딩 증가 */
+        }
+        .modal-content p {
+            font-size: 1.1rem; /* 모달 메시지 글꼴 크기 */
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+    <div class="container mx-auto p-4">
+        <h1 class="text-2xl font-bold text-center mb-4 text-blue-700">⭐ 스티커 보드 앱 ⭐</h1>
+
+        <div id="userIdDisplay" class="text-base text-gray-500 text-center mb-4">
+            사용자 ID: <span id="currentUserId" class="font-mono text-gray-600">불러오는 중...</span>
+        </div>
+
+        <div class="flex border-b border-gray-300 mb-4">
+            <button id="studentsTabBtn" class="flex-1 py-3 px-4 text-center text-base font-medium text-gray-600 hover:text-blue-700 focus:outline-none rounded-t-lg bg-white border border-b-0 border-transparent transition duration-150 ease-in-out active-tab">학생 관리</button>
+            <button id="rewardsTabBtn" class="flex-1 py-3 px-4 text-center text-base font-medium text-gray-600 hover:text-blue-700 focus:outline-none rounded-t-lg bg-gray-100 border border-b-0 border-transparent transition duration-150 ease-in-out">보상 관리</button>
+            <button id="statsTabBtn" class="flex-1 py-3 px-4 text-center text-base font-medium text-gray-600 hover:text-blue-700 focus:outline-none rounded-t-lg bg-gray-100 border border-b-0 border-transparent transition duration-150 ease-in-out">통계 & AI</button>
+        </div>
+
+        <div id="studentsTab" class="tab-content active bg-white p-5 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-3 text-blue-600">학생 목록</h2>
+            <div class="flex mb-4">
+                <input type="text" id="newStudentName" placeholder="새 학생 이름" class="flex-1 p-3 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-base">
+                <button id="addStudentBtn" class="bg-blue-500 text-white p-3 rounded-r-md hover:bg-blue-600 transition duration-150 ease-in-out text-base">추가</button>
+            </div>
+            <div id="studentList" class="space-y-4 student-list">
+                <p class="text-gray-500 text-center text-base" id="noStudentsMessage">학생이 없습니다. 학생을 추가해주세요.</p>
+            </div>
+        </div>
+
+        <div id="rewardsTab" class="tab-content bg-white p-5 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-3 text-green-600">보상 상품 관리</h2>
+            <div class="flex flex-col mb-4 space-y-3">
+                <input type="text" id="newRewardName" placeholder="보상 상품 이름" class="p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-base">
+                <input type="number" id="newRewardCost" placeholder="필요 포인트" class="p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-base" min="0">
+                <div class="flex items-center space-x-2">
+                    <label for="rewardTypeEmoji" class="text-gray-700 text-base">유형 이모지:</label>
+                    <input type="text" id="rewardTypeEmoji" placeholder="✏️, 🎮, 📚 등" class="flex-1 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-base">
+                </div>
+                <button id="addRewardBtn" class="bg-green-500 text-white p-3 rounded-md hover:bg-green-600 transition duration-150 ease-in-out text-base">추가</button>
+            </div>
+            <div id="rewardList" class="space-y-4 reward-list">
+                <p class="text-gray-500 text-center text-base" id="noRewardsMessage">등록된 보상 상품이 없습니다.</p>
+            </div>
+        </div>
+
+        <div id="statsTab" class="tab-content bg-white p-5 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-3 text-purple-600">통계 & AI 분석</h2>
+            <div class="mb-4">
+                <label for="selectedStudentForStats" class="block text-base font-medium text-gray-700 mb-1">학생 선택:</label>
+                <select id="selectedStudentForStats" class="block w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-base">
+                    <option value="">모든 학생</option>
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <h3 class="text-lg font-semibold text-gray-700 mb-2">상/벌점 추이</h3>
+                <canvas id="pointsChart"></canvas>
+            </div>
+
+            <div class="mb-4">
+                <h3 class="text-lg font-semibold text-gray-700 mb-2">AI 기반 알림 (행동 이상 감지)</h3>
+                <div id="aiAlerts" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-md hidden">
+                    <p class="font-bold text-base">주의!</p>
+                    <p id="aiAlertMessage" class="text-base"></p>
+                </div>
+                <p id="noAiAlerts" class="text-gray-500 text-base mt-2">현재 특별한 행동 이상 감지 내역이 없습니다.</p>
+            </div>
+
+            <div>
+                <h3 class="text-lg font-semibold text-gray-700 mb-2">AI 기반 보상 추천</h3>
+                <div id="aiRecommendedRewards" class="space-y-3">
+                    <p class="text-gray-500 text-base">학생을 선택하면 추천 보상을 볼 수 있습니다.</p>
+                    </div>
+                <p id="noAiRecommendations" class="text-gray-500 text-base mt-2 hidden">추천 보상이 없습니다.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmationModal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-button" id="closeModalBtn">&times;</span>
+            <p id="modalMessage" class="text-lg mb-4"></p>
+            <div class="flex justify-center space-x-4">
+                <button id="confirmYesBtn" class="bg-blue-500 text-white px-5 py-2.5 rounded-md hover:bg-blue-600 transition text-base">확인</button>
+                <button id="confirmNoBtn" class="bg-gray-300 text-gray-800 px-5 py-2.5 rounded-md hover:bg-gray-400 transition text-base">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // Chart.js는 UMD 번들이며, 'default' export를 제공하지 않습니다.
+        // 스크립트 태그로 로드되면 'Chart' 전역 객체로 사용할 수 있습니다.
+        // import Chart from 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'; // 이 줄은 이제 필요 없습니다.
+
+        // Firebase Configuration and Initialization
+        // These global variables are provided by the Canvas environment.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+
+        let app;
+        let db;
+        let auth;
+        let userId = 'loading'; // Default loading state for userId
+        let currentClassroomId = 'default-classroom'; // For simplicity, we'll use a single default classroom ID
+
+        const studentListDiv = document.getElementById('studentList');
+        const rewardListDiv = document.getElementById('rewardList');
+        const newStudentNameInput = document.getElementById('newStudentName');
+        const addStudentBtn = document.getElementById('addStudentBtn');
+        const newRewardNameInput = document.getElementById('newRewardName');
+        const newRewardCostInput = document.getElementById('newRewardCost');
+        const rewardTypeEmojiInput = document.getElementById('rewardTypeEmoji');
+        const addRewardBtn = document.getElementById('addRewardBtn');
+        const noStudentsMessage = document.getElementById('noStudentsMessage');
+        const noRewardsMessage = document.getElementById('noRewardsMessage');
+        const currentUserIdSpan = document.getElementById('currentUserId');
+        const selectedStudentForStats = document.getElementById('selectedStudentForStats');
+        const aiAlertsDiv = document.getElementById('aiAlerts');
+        const aiAlertMessageP = document.getElementById('aiAlertMessage');
+        const noAiAlertsP = document.getElementById('noAiAlerts');
+        const aiRecommendedRewardsDiv = document.getElementById('aiRecommendedRewards');
+        const noAiRecommendationsP = document.getElementById('noAiRecommendations');
+
+        // Modal Elements
+        const confirmationModal = document.getElementById('confirmationModal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const modalMessage = document.getElementById('modalMessage');
+        const confirmYesBtn = document.getElementById('confirmYesBtn');
+        const confirmNoBtn = document.getElementById('confirmNoBtn');
+        let resolveModalPromise; // To resolve the modal confirmation promise
+
+        // Chart.js instance
+        let pointsChart;
+
+        // --- Utility Functions ---
+
+        /**
+         * Displays a confirmation modal to the user.
+         * @param {string} message The message to display in the modal.
+         * @returns {Promise<boolean>} A promise that resolves to true if 'Yes' is clicked, false otherwise.
+         */
+        function showConfirmationModal(message) {
+            modalMessage.textContent = message;
+            confirmationModal.classList.remove('hidden');
+
+            return new Promise((resolve) => {
+                resolveModalPromise = resolve;
+                // Add event listeners for modal buttons
+                confirmYesBtn.onclick = () => {
+                    confirmationModal.classList.add('hidden');
+                    resolve(true);
+                };
+                confirmNoBtn.onclick = () => {
+                    confirmationModal.classList.add('hidden');
+                    resolve(false);
+                };
+                closeModalBtn.onclick = () => {
+                    confirmationModal.classList.add('hidden');
+                    resolve(false); // Treat closing as cancellation
+                };
+            });
+        }
+
+        // --- Firebase Initialization and Auth ---
+        async function initializeFirebaseAndAuth() {
+            try {
+                if (!app) { // Initialize only once
+                    app = initializeApp(firebaseConfig);
+                    db = getFirestore(app);
+                    auth = getAuth(app);
+
+                    onAuthStateChanged(auth, async (user) => {
+                        if (user) {
+                            userId = user.uid;
+                            currentUserIdSpan.textContent = userId;
+                            console.log('Firebase authenticated. User ID:', userId);
+                            await loadData(); // Load all data after authentication
+                        } else {
+                            // If initial auth token is not defined, sign in anonymously
+                            if (typeof __initial_auth_token !== 'undefined') {
+                                try {
+                                    await signInWithCustomToken(auth, __initial_auth_token);
+                                    console.log('Signed in with custom token.');
+                                } catch (error) {
+                                    console.error('Error signing in with custom token:', error);
+                                    await signInAnonymously(auth); // Fallback to anonymous
+                                    console.log('Signed in anonymously due to custom token error.');
+                                }
+                            } else {
+                                await signInAnonymously(auth);
+                                console.log('Signed in anonymously.');
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error("Firebase 초기화 또는 인증 중 오류 발생:", error);
+                currentUserIdSpan.textContent = '오류 발생';
+            }
+        }
+
+        // --- Data Loading and Real-time Listeners ---
+
+        let students = [];
+        let rewards = [];
+        let transactions = [];
+
+        async function loadData() {
+            if (!userId || userId === 'loading') {
+                console.warn('User ID not available yet for data loading.');
+                return;
+            }
+
+            // Public data path: /artifacts/{appId}/public/data/{your_collection_name}
+            // Private data path: /artifacts/${appId}/users/${userId}/{your_collection_name}
+
+            const studentColRef = collection(db, `artifacts/${appId}/users/${userId}/classrooms/${currentClassroomId}/students`);
+            const rewardColRef = collection(db, `artifacts/${appId}/users/${userId}/classrooms/${currentClassroomId}/rewardItems`);
+            const transactionColRef = collection(db, `artifacts/${appId}/users/${userId}/classrooms/${currentClassroomId}/transactions`);
+            const exchangeColRef = collection(db, `artifacts/${appId}/users/${userId}/classrooms/${currentClassroomId}/rewardExchanges`); // For future use in AI recommendation
+
+            // Listen for real-time updates for students
+            onSnapshot(studentColRef, (snapshot) => {
+                students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderStudents();
+                updateStudentSelectForStats();
+                console.log('학생 데이터 업데이트됨:', students);
+            }, (error) => {
+                console.error("학생 데이터 로드 중 오류:", error);
+            });
+
+            // Listen for real-time updates for rewards
+            onSnapshot(rewardColRef, (snapshot) => {
+                rewards = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderRewards();
+                console.log('보상 데이터 업데이트됨:', rewards);
+            }, (error) => {
+                console.error("보상 데이터 로드 중 오류:", error);
+            });
+
+            // Listen for real-time updates for transactions
+            onSnapshot(transactionColRef, (snapshot) => {
+                transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                updateChart();
+                checkAiAlerts(); // Re-run AI alerts on new transactions
+                console.log('거래 내역 데이터 업데이트됨:', transactions);
+            }, (error) => {
+                console.error("거래 내역 로드 중 오류:", error);
+            });
+        }
+
+        // --- Render Functions ---
+
+        function renderStudents() {
+            studentListDiv.innerHTML = '';
+            if (students.length === 0) {
+                noStudentsMessage.classList.remove('hidden');
+                return;
+            }
+            noStudentsMessage.classList.add('hidden');
+
+            students.forEach(student => {
+                const studentDiv = document.createElement('div');
+                studentDiv.className = 'flex items-center justify-between p-3 bg-blue-50 rounded-md shadow-sm border border-blue-200';
+                studentDiv.innerHTML = `
+                    <div class="flex-1">
+                        <span class="font-semibold text-blue-800 text-lg">${student.name}</span>
+                        <span class="ml-2 text-base text-gray-600">(${student.currentPoints || 0} 포인트)</span>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button data-id="${student.id}" data-type="positive" class="add-points-btn bg-green-500 text-white p-2 rounded-full w-9 h-9 flex items-center justify-center text-xl hover:bg-green-600 transition duration-150 ease-in-out" title="상점 부여">➕</button>
+                        <button data-id="${student.id}" data-type="negative" class="subtract-points-btn bg-red-500 text-white p-2 rounded-full w-9 h-9 flex items-center justify-center text-xl hover:bg-red-600 transition duration-150 ease-in-out" title="벌점 부여">➖</button>
+                        <button data-id="${student.id}" class="exchange-reward-btn bg-purple-500 text-white p-2 rounded-md hover:bg-purple-600 transition duration-150 ease-in-out text-base" title="보상 교환">교환</button>
+                        <button data-id="${student.id}" class="delete-student-btn bg-gray-300 text-gray-700 p-2 rounded-md hover:bg-gray-400 transition duration-150 ease-in-out text-base" title="학생 삭제">삭제</button>
+                    </div>
+                `;
+                studentListDiv.appendChild(studentDiv);
+            });
+            attachStudentEventListeners();
+        }
+
+        function renderRewards() {
+            rewardListDiv.innerHTML = '';
+            if (rewards.length === 0) {
+                noRewardsMessage.classList.remove('hidden');
+                return;
+            }
+            noRewardsMessage.classList.add('hidden');
+
+            rewards.forEach(reward => {
+                const rewardDiv = document.createElement('div');
+                rewardDiv.className = 'flex items-center justify-between p-3 bg-green-50 rounded-md shadow-sm border border-green-200';
+                rewardDiv.innerHTML = `
+                    <div class="flex-1">
+                        <span class="sticker-emoji mr-2">${reward.emoji || '🎁'}</span>
+                        <span class="font-semibold text-green-800 text-lg">${reward.name}</span>
+                        <span class="ml-2 text-base text-gray-600">(${reward.cost} 포인트)</span>
+                    </div>
+                    <button data-id="${reward.id}" class="delete-reward-btn bg-gray-300 text-gray-700 p-2 rounded-md hover:bg-gray-400 transition duration-150 ease-in-out text-base" title="보상 삭제">삭제</button>
+                `;
+                rewardListDiv.appendChild(rewardDiv);
+            });
+            attachRewardEventListeners();
+        }
+
+        function renderRecommendedRewards(studentId) {
+            aiRecommendedRewardsDiv.innerHTML = '';
+            const student = students.find(s => s.id === studentId);
+            if (!student) {
+                aiRecommendedRewardsDiv.innerHTML = '<p class="text-gray-500 text-base">학생을 선택해주세요.</p>';
+                noAiRecommendationsP.classList.add('hidden');
+                return;
+            }
+
+            const recommended = recommendRewards(student);
+            if (recommended.length === 0) {
+                noAiRecommendationsP.classList.remove('hidden');
+                aiRecommendedRewardsDiv.innerHTML = '<p class="text-gray-500 text-base">추천할 보상이 없습니다.</p>';
+                return;
+            }
+            noAiRecommendationsP.classList.add('hidden');
+
+            recommended.forEach(reward => {
+                const rewardDiv = document.createElement('div');
+                rewardDiv.className = 'flex items-center p-3 bg-purple-50 rounded-md shadow-sm border border-purple-200';
+                rewardDiv.innerHTML = `
+                    <span class="sticker-emoji mr-2">${reward.emoji || '🎁'}</span>
+                    <div class="flex-1">
+                        <span class="font-semibold text-purple-800 text-lg">${reward.name}</span>
+                        <span class="ml-2 text-base text-gray-600">(${reward.cost} 포인트)</span>
+                    </div>
+                `;
+                aiRecommendedRewardsDiv.appendChild(rewardDiv);
+            });
+        }
+
+        // --- Event Listeners for UI Actions ---
+
+        addStudentBtn.addEventListener('click', async () => {
+            const studentName = newStudentNameInput.value.trim();
+            if (studentName) {
+                try {
+                    const studentRef = collection(db, `artifacts/${appId}/users/${userId}/classrooms/${currentClassroomId}/students`);
+                    await addDoc(studentRef, {
+                        name: studentName,
+                        currentPoints: 0,
+                        preferences: [], // For future AI recommendations
+                        createdAt: new Date()
+                    });
+                    newStudentNameInput.value = '';
+                    console.log('학생 추가됨:', studentName);
+                } catch (e) {
+                    console.error("학생 추가 중 오류:", e);
+                }
+            } else {
+                showConfirmationModal("학생 이름을 입력해주세요.");
+            }
+        });
+
+        addRewardBtn.addEventListener('click', async () => {
+            const rewardName = newRewardNameInput.value.trim();
+            const rewardCost = parseInt(newRewardCostInput.value, 10);
+            const rewardEmoji = rewardTypeEmojiInput.value.trim() || '🎁'; // Default emoji
+
+            if (rewardName && !isNaN(rewardCost) && rewardCost >= 0) {
+                try {
+                    const rewardRef = collection(db, `artifacts/${appId}/users/${userId}/classrooms/${currentClassroomId}/rewardItems`);
+                    await addDoc(rewardRef, {
+                        name: rewardName,
+                        cost: rewardCost,
+                        emoji: rewardEmoji,
+                        createdAt: new Date()
+                    });
+                    newRewardNameInput.value = '';
+                    newRewardCostInput.value = '';
+                    rewardTypeEmojiInput.value = '';
+                    console.log('보상 상품 추가됨:', rewardName);
+                } catch (e) {
+                    console.error("보상 상품 추가 중 오류:", e);
+                }
+            } else {
+                showConfirmationModal("보상 상품 이름과 유효한 포인트를 입력해주세요.");
+            }
+        });
+
+        function attachStudentEventListeners() {
+            document.querySelectorAll('.add-points-btn').forEach(button => {
+                button.onclick = async (e) => {
+                    const studentId = e.currentTarget.dataset.id;
+                    const student = students.find(s => s.id === studentId);
+                    if (student) {
+                        const newPoints = student.currentPoints + 1;
+                        await updateStudentPoints(studentId, newPoints, 'positive', '수업 중 긍정적 행동');
+                    }
+                };
+            });
+
+            document.querySelectorAll('.subtract-points-btn').forEach(button => {
+                button.onclick = async (e) => {
+                    const studentId = e.currentTarget.dataset.id;
+                    const student = students.find(s => s.id === studentId);
+                    if (student) {
+                        const newPoints = Math.max(0, student.currentPoints - 1); // Points cannot go below 0
+                        await updateStudentPoints(studentId, newPoints, 'negative', '벌점 부여 (수업 방해 등)');
+                    }
+                };
+            });
+
+            document.querySelectorAll('.exchange-reward-btn').forEach(button => {
+                button.onclick = async (e) => {
+                    const studentId = e.currentTarget.dataset.id;
+                    const student = students.find(s => s.id === studentId);
+                    if (!student) return;
+
+                    const availableRewards = rewards.filter(r => r.cost <= student.currentPoints);
+                    if (availableRewards.length === 0) {
+                        showConfirmationModal(`${student.name} 학생이 교환할 수 있는 보상이 없습니다. (현재 ${student.currentPoints} 포인트)`);
+                        return;
+                    }
+
+                    // Simple reward selection modal (for demonstration)
+                    let rewardSelectionHtml = `<p class="mb-3 text-base">교환할 보상을 선택하세요 (현재 포인트: ${student.currentPoints}):</p><div class="space-y-2">`;
+                    availableRewards.forEach(r => {
+                        rewardSelectionHtml += `
+                            <button data-reward-id="${r.id}" class="select-reward-for-exchange bg-blue-100 text-blue-800 p-2.5 rounded-md hover:bg-blue-200 w-full text-left transition duration-150 ease-in-out text-base">
+                                ${r.emoji || '🎁'} ${r.name} (${r.cost} 포인트)
+                            </button>
+                        `;
+                    });
+                    rewardSelectionHtml += `</div>`;
+                    
+                    modalMessage.innerHTML = rewardSelectionHtml;
+                    confirmYesBtn.classList.add('hidden'); // Hide default buttons
+                    confirmNoBtn.classList.add('hidden');
+                    confirmationModal.classList.remove('hidden');
+
+                    document.querySelectorAll('.select-reward-for-exchange').forEach(rewardButton => {
+                        rewardButton.onclick = async (ev) => {
+                            const rewardId = ev.currentTarget.dataset.rewardId;
+                            const selectedReward = rewards.find(r => r.id === rewardId);
+
+                            if (selectedReward && student.currentPoints >= selectedReward.cost) {
+                                const confirmed = await showConfirmationModal(`${student.name} 학생이 ${selectedReward.name} (${selectedReward.cost} 포인트)를 교환하시겠습니까?`);
+                                if (confirmed) {
+                                    const newPoints = student.currentPoints - selectedReward.cost;
+                                    await updateStudentPoints(studentId, newPoints, 'exchange', `${selectedReward.name} 교환`, selectedReward.id);
+                                    
+                                    // Record the exchange
+                                    const exchangeRef = collection(db, `artifacts/${appId}/users/${userId}/classrooms/${currentClassroomId}/rewardExchanges`);
+                                    await addDoc(exchangeRef, {
+                                        studentId: studentId,
+                                        itemId: selectedReward.id,
+                                        pointsCost: selectedReward.cost,
+                                        timestamp: new Date()
+                                    });
+                                    showConfirmationModal(`${student.name} 학생이 ${selectedReward.name}을(를) 성공적으로 교환했습니다!`);
+                                }
+                            } else {
+                                showConfirmationModal("포인트가 부족하거나 유효하지 않은 보상입니다.");
+                            }
+                            confirmationModal.classList.add('hidden'); // Hide selection modal
+                            // Re-show original buttons for next time
+                            confirmYesBtn.classList.remove('hidden');
+                            confirmNoBtn.classList.remove('hidden');
+                        };
+                    });
+                };
+            });
+
+
+            document.querySelectorAll('.delete-student-btn').forEach(button => {
+                button.onclick = async (e) => {
+                    const studentId = e.currentTarget.dataset.id;
+                    const student = students.find(s => s.id === studentId);
+                    const confirmed = await showConfirmationModal(`정말로 ${student.name} 학생을 삭제하시겠습니까? 모든 상/벌점 내역도 삭제됩니다.`);
+                    if (confirmed) {
+                        try {
+                            // Delete student document
+                            await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/classrooms/${currentClassroomId}/students`, studentId));
+
+                            // Delete all associated transactions (more robust approach would be a batch delete or server-side function)
+                            const q = query(collection(db, `artifacts/${appId}/users/${userId}/classrooms/${currentClassroomId}/transactions`), where("studentId", "==", studentId));
+                            const querySnapshot = await getDocs(q);
+                            querySnapshot.forEach(async (d) => {
+                                await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/classrooms/${currentClassroomId}/transactions`, d.id));
+                            });
+                            showConfirmationModal(`${student.name} 학생이 삭제되었습니다.`);
+                            console.log('학생 삭제됨:', studentId);
+                        } catch (e) {
+                            console.error("학생 삭제 중 오류:", e);
+                            showConfirmationModal("학생 삭제 중 오류가 발생했습니다.");
+                        }
+                    }
+                };
+            });
+        }
+
+        function attachRewardEventListeners() {
+            document.querySelectorAll('.delete-reward-btn').forEach(button => {
+                button.onclick = async (e) => {
+                    const rewardId = e.currentTarget.dataset.id;
+                    const reward = rewards.find(r => r.id === rewardId);
+                    const confirmed = await showConfirmationModal(`정말로 ${reward.name} 보상 상품을 삭제하시겠습니까?`);
+                    if (confirmed) {
+                        try {
+                            await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/classrooms/${currentClassroomId}/rewardItems`, rewardId));
+                            showConfirmationModal(`${reward.name} 보상 상품이 삭제되었습니다.`);
+                            console.log('보상 상품 삭제됨:', rewardId);
+                        } catch (e) {
+                            console.error("보상 상품 삭제 중 오류:", e);
+                            showConfirmationModal("보상 상품 삭제 중 오류가 발생했습니다.");
+                        }
+                    }
+                };
+            });
+        }
+
+        // --- Firebase Data Operations ---
+
+        async function updateStudentPoints(studentId, newPoints, transactionType, reason, rewardId = null) {
+            try {
+                const studentDocRef = doc(db, `artifacts/${appId}/users/${userId}/classrooms/${currentClassroomId}/students`, studentId);
+                await updateDoc(studentDocRef, {
+                    currentPoints: newPoints
+                });
+
+                // Record the transaction
+                const transactionColRef = collection(db, `artifacts/${appId}/users/${userId}/classrooms/${currentClassroomId}/transactions`);
+                await addDoc(transactionColRef, {
+                    studentId: studentId,
+                    type: transactionType, // 'positive', 'negative', 'exchange'
+                    amount: transactionType === 'positive' ? 1 : (transactionType === 'negative' ? -1 : (newPoints - students.find(s => s.id === studentId).currentPoints)), // Calculate actual amount changed
+                    reason: reason,
+                    rewardId: rewardId, // Null if not an exchange
+                    timestamp: new Date()
+                });
+                console.log(`학생 ${studentId} 포인트 업데이트: ${newPoints}, 트랜잭션 기록됨`);
+            } catch (e) {
+                console.error("학생 포인트 업데이트 또는 트랜잭션 기록 중 오류:", e);
+                showConfirmationModal("포인트 업데이트 중 오류가 발생했습니다.");
+            }
+        }
+
+        // --- Chart & AI Functions ---
+
+        function updateStudentSelectForStats() {
+            selectedStudentForStats.innerHTML = '<option value="">모든 학생</option>';
+            students.forEach(student => {
+                const option = document.createElement('option');
+                option.value = student.id;
+                option.textContent = student.name;
+                selectedStudentForStats.appendChild(option);
+            });
+        }
+
+        selectedStudentForStats.addEventListener('change', () => {
+            updateChart();
+            checkAiAlerts(); // Re-check alerts for selected student
+            renderRecommendedRewards(selectedStudentForStats.value); // Re-render recommendations
+        });
+
+        function updateChart() {
+            const selectedStudentId = selectedStudentForStats.value;
+            let filteredTransactions = transactions;
+
+            if (selectedStudentId) {
+                filteredTransactions = transactions.filter(t => t.studentId === selectedStudentId);
+            }
+
+            // Sort transactions by timestamp
+            filteredTransactions.sort((a, b) => a.timestamp.toDate() - b.timestamp.toDate());
+
+            const labels = [];
+            const data = [];
+            const currentPoints = {}; // Track points for each student
+
+            // Initialize current points for all students to 0
+            students.forEach(s => currentPoints[s.id] = 0);
+
+            // Calculate cumulative points over time
+            filteredTransactions.forEach(t => {
+                const date = t.timestamp.toDate().toLocaleDateString('ko-KR');
+                // const studentName = students.find(s => s.id === t.studentId)?.name || '알 수 없음'; // Not used for chart data directly
+
+                // Update points for the specific student involved in the transaction
+                currentPoints[t.studentId] += t.amount;
+
+                // Add label if it's a new date or the first entry
+                if (!labels.includes(date)) {
+                    labels.push(date);
+                    // If showing all students, sum up all current points for this date
+                    if (!selectedStudentId) {
+                        data.push(Object.values(currentPoints).reduce((sum, val) => sum + val, 0));
+                    } else {
+                        // If showing one student, just show their points
+                        data.push(currentPoints[t.studentId]);
+                    }
+                } else {
+                    // Update the last data point
+                    if (!selectedStudentId) {
+                        data[data.length - 1] = Object.values(currentPoints).reduce((sum, val) => sum + val, 0);
+                    } else {
+                        data[data.length - 1] = currentPoints[t.studentId];
+                    }
+                }
+            });
+
+            // If no transactions, but students exist, show current points
+            if (filteredTransactions.length === 0 && students.length > 0) {
+                 const currentStudentsPoints = selectedStudentId ? 
+                    (students.find(s => s.id === selectedStudentId)?.currentPoints || 0) :
+                    students.reduce((sum, s) => sum + s.currentPoints, 0);
+                
+                labels.push(new Date().toLocaleDateString('ko-KR'));
+                data.push(currentStudentsPoints);
+            } else if (students.length === 0) {
+                labels.push('데이터 없음');
+                data.push(0);
+            }
+
+
+            const chartData = {
+                labels: labels,
+                datasets: [{
+                    label: selectedStudentId ? '누적 포인트' : '학급 전체 누적 포인트',
+                    data: data,
+                    borderColor: '#6366f1',
+                    backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                    fill: true,
+                    tension: 0.3
+                }]
+            };
+
+            const config = {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 14 // 범례 글꼴 크기 증가
+                                }
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: selectedStudentId ? '선택 학생 포인트 추이' : '학급 전체 포인트 추이',
+                            font: {
+                                size: 16 // 차트 제목 글꼴 크기 증가
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '포인트',
+                                font: {
+                                    size: 14 // y축 제목 글꼴 크기 증가
+                                }
+                            },
+                            ticks: {
+                                font: {
+                                    size: 12 // y축 눈금 글꼴 크기 증가
+                                }
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: '날짜',
+                                font: {
+                                    size: 14 // x축 제목 글꼴 크기 증가
+                                }
+                            },
+                            ticks: {
+                                font: {
+                                    size: 12 // x축 눈금 글꼴 크기 증가
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            const ctx = document.getElementById('pointsChart').getContext('2d');
+            if (pointsChart) {
+                pointsChart.destroy(); // Destroy previous chart instance
+            }
+            // Chart.js를 전역 객체인 'window.Chart'로 접근합니다.
+            pointsChart = new window.Chart(ctx, config); 
+        }
+
+        // --- Simplified AI Logic ---
+
+        /**
+         * AI 기능 1: 행동 이상 감지 (간단한 규칙 기반)
+         * - 최근 며칠간 벌점이 연속으로 많거나, 특정 행동으로 인해 벌점이 급격히 증가하는 경우 알림
+         */
+        function checkAiAlerts() {
+            const selectedStudentId = selectedStudentForStats.value;
+            let targetTransactions = transactions;
+
+            if (selectedStudentId) {
+                targetTransactions = transactions.filter(t => t.studentId === selectedStudentId);
+            }
+
+            // Get transactions from the last 7 days
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            const recentTransactions = targetTransactions.filter(t => t.timestamp.toDate() > sevenDaysAgo);
+
+            let alertMessage = '';
+            let showAlert = false;
+
+            if (selectedStudentId) {
+                const studentRecentNegativeTransactions = recentTransactions.filter(t => t.studentId === selectedStudentId && t.type === 'negative');
+                if (studentRecentNegativeTransactions.length >= 3) { // If 3 or more negative transactions in last 7 days
+                    // Check for rapid decline in points
+                    const student = students.find(s => s.id === selectedStudentId);
+                    // Simplified check: if current points are less than initial points minus expected decline from negative transactions
+                    // This logic had a minor issue (using createdAt.toDate().getTime()), so simplifying it.
+                    // A better AI model would track a baseline and detect significant deviations.
+                    // For now, if there are 3+ recent negative transactions for a selected student, alert.
+                    if (student) { // Ensure student is found
+                        alertMessage += `${student.name} 학생의 최근 행동에 주의가 필요합니다. 최근 벌점 기록이 많습니다. `;
+                        showAlert = true;
+                    }
+                }
+            } else { // Check for class-wide trends
+                const classNegativeTransactions = recentTransactions.filter(t => t.type === 'negative');
+                if (classNegativeTransactions.length > students.length * 2) { // If total negative transactions are more than twice the number of students
+                    alertMessage += `학급 전체적으로 최근 벌점 부여가 증가했습니다. 전반적인 분위기를 살펴볼 필요가 있습니다. `;
+                    showAlert = true;
+                }
+            }
+
+            if (showAlert) {
+                aiAlertsDiv.classList.remove('hidden');
+                noAiAlertsP.classList.add('hidden');
+                aiAlertMessageP.textContent = alertMessage;
+            } else {
+                aiAlertsDiv.classList.add('hidden');
+                noAiAlertsP.classList.remove('hidden');
+            }
+        }
+
+
+        /**
+         * AI 기능 2: 맞춤형 보상 추천 (간단한 규칙 기반)
+         * - 학생의 현재 포인트와 선호도(미구현, 나중에 확장 가능)를 기반으로 교환 가능한 보상 추천
+         * - 여기서는 단순히 '현재 포인트로 교환 가능한 보상'을 추천합니다.
+         */
+        function recommendRewards(student) {
+            if (!student) {
+                return [];
+            }
+            // Filter rewards based on student's current points
+            const affordableRewards = rewards.filter(r => r.cost <= student.currentPoints);
+
+            // Further refinement could be based on student preferences if we add a 'preferences' field to student data
+            // Example: If student.preferences includes 'books', prioritize book rewards.
+            // For now, just return affordable rewards
+            return affordableRewards;
+        }
+
+        // --- Tab Navigation ---
+
+        function activateTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+                content.classList.add('hidden'); // Ensure it's truly hidden
+            });
+            document.querySelectorAll('button[id$="TabBtn"]').forEach(btn => {
+                btn.classList.remove('active-tab', 'bg-white');
+                btn.classList.add('bg-gray-100');
+            });
+
+            document.getElementById(tabId).classList.add('active');
+            document.getElementById(tabId).classList.remove('hidden'); // Show the active tab
+            document.getElementById(`${tabId.replace('Tab', 'TabBtn')}`).classList.add('active-tab', 'bg-white');
+            document.getElementById(`${tabId.replace('Tab', 'TabBtn')}`).classList.remove('bg-gray-100');
+
+            // Re-render chart if switching to stats tab
+            if (tabId === 'statsTab') {
+                updateChart();
+                checkAiAlerts();
+                renderRecommendedRewards(selectedStudentForStats.value);
+            }
+        }
+
+        document.getElementById('studentsTabBtn').addEventListener('click', () => activateTab('studentsTab'));
+        document.getElementById('rewardsTabBtn').addEventListener('click', () => activateTab('rewardsTab'));
+        document.getElementById('statsTabBtn').addEventListener('click', () => activateTab('statsTab'));
+
+        // Initial tab activation on load
+        document.addEventListener('DOMContentLoaded', () => {
+            activateTab('studentsTab'); // Default to students tab
+            initializeFirebaseAndAuth(); // Initialize Firebase when DOM is ready
+        });
+
+    </script>
+</body>
+</html>
